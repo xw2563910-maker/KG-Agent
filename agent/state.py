@@ -1,6 +1,10 @@
-from typing import TypedDict
+from typing import Literal, NotRequired, TypedDict
+
+
+Route = Literal["general", "research"]
 
 
 class AgentState(TypedDict):
     question: str
-    answer: str
+    route: NotRequired[Route]
+    answer: NotRequired[str]

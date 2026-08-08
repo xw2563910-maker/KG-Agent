@@ -8,6 +8,12 @@ from config.settings import (
 )
 
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a scientific research assistant. "
+    "Answer questions accurately and concisely."
+)
+
+
 def create_llm_client() -> OpenAI:
     validate_llm_config()
 
@@ -17,7 +23,10 @@ def create_llm_client() -> OpenAI:
     )
 
 
-def chat(prompt: str) -> str:
+def chat(
+    prompt: str,
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+) -> str:
     if not prompt.strip():
         raise ValueError("Prompt cannot be empty.")
 
@@ -29,10 +38,7 @@ def chat(prompt: str) -> str:
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You are a scientific research assistant. "
-                        "Answer questions accurately and concisely."
-                    ),
+                    "content": system_prompt,
                 },
                 {
                     "role": "user",
