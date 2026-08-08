@@ -1,4 +1,4 @@
-from llm.client import chat
+from agent.graph import run_agent
 
 
 def main():
@@ -8,11 +8,11 @@ def main():
     question = input("请输入你的问题：")
 
     try:
-        print("\n正在调用 DeepSeek...\n")
+        print("\n正在运行 KG-Agent...\n")
 
-        answer = chat(question)
+        answer = run_agent(question)
 
-        print("DeepSeek 回答：")
+        print("KG-Agent 回答：")
         print(answer)
 
     except (ValueError, RuntimeError) as exc:
