@@ -1,5 +1,4 @@
-from typing import Literal, NotRequired, TypedDict
-from typing import Any
+from typing import Any, Literal, NotRequired, TypedDict
 
 
 Route = Literal["general", "research"]
@@ -7,7 +6,14 @@ Route = Literal["general", "research"]
 
 class AgentState(TypedDict):
     question: str
+
     route: NotRequired[Route]
+
     search_query: NotRequired[str]
+    from_year: NotRequired[int]
+    to_year: NotRequired[int]
+    search_limit: NotRequired[int]
+
     papers: NotRequired[list[dict[str, Any]]]
+
     answer: NotRequired[str]

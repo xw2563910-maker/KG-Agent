@@ -11,33 +11,126 @@ from config.settings import (
 OPENALEX_WORKS_URL = "https://api.openalex.org/works"
 
 
+def reconstruct_abstract(
+    inverted_index: dict[str, list[int]] | None,
+) -> str | None:
+    """
+    Reconstruct an abstract from OpenAlex's inverted index format.
+
+    Example:
+        {
+            "Knowledge": [0],
+            "graphs": [1],
+            "are": [2],
+            "useful": [3]
+        }
+
+    Becomes:
+        "Knowledge graphs are useful"
+    """
+    if not inverted_index:
+        return None
+
+    positions = [
+        position
+        for word_positions in inverted_index.values()
+        for position in word_positions
+    ]
+
+    if not positions:
+        return None
+
+    words = [""] * (max(positions) + 1)
+
+    for word, word_positions in inverted_index.items():
+        for position in word_positions:
+            if 0 <= position < len(words):
+                words[position] = word
+
+    abstract = " ".join(
+        word
+        for word in words
+        if word
+    )
+
+    return abstract or None
+
+
 def search_papers(
     query: str,
     limit: int = 5,
+    from_year: int | None = None,
+    to_year: int | None = None,
+    require_abstract: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Search academic papers from OpenAlex.
 
     Args:
-        query: Search keywords.
-        limit: Maximum number of papers to return.
+        query:
+            Academic search keywords.
+
+        limit:
+            Maximum number of papers to return.
+
+        from_year:
+            Beginning publication year.
+
+        to_year:
+            Ending publication year.
+
+        require_abstract:
+            Whether returned papers must contain abstracts.
 
     Returns:
         A list of normalized paper metadata dictionaries.
     """
     if not query.strip():
-        raise ValueError("Paper search query cannot be empty.")
+        raise ValueError(
+            "Paper search query cannot be empty."
+        )
 
     if not 1 <= limit <= 25:
-        raise ValueError("Paper search limit must be between 1 and 25.")
+        raise ValueError(
+            "Paper search limit must be between 1 and 25."
+        )
+
+    if (from_year is None) != (to_year is None):
+        raise ValueError(
+            "from_year and to_year must be provided together."
+        )
+
+    if (
+        from_year is not None
+        and to_year is not None
+        and from_year > to_year
+    ):
+        raise ValueError(
+            "from_year cannot be greater than to_year."
+        )
 
     validate_openalex_config()
+
+    filters = []
+
+    if from_year is not None and to_year is not None:
+        filters.append(
+            f"publication_year:{from_year}-{to_year}"
+        )
+
+    if require_abstract:
+        filters.append(
+            "has_abstract:true"
+        )
 
     params = {
         "search": query,
         "per-page": limit,
         "api_key": OPENALEX_API_KEY,
     }
+
+    if filters:
+        params["filter"] = ",".join(filters)
 
     try:
         response = httpx.get(
@@ -60,26 +153,60 @@ def search_papers(
     for work in data.get("results", []):
         authors = []
 
-        for authorship in work.get("authorships", []):
-            author = authorship.get("author") or {}
-            author_name = author.get("display_name")
+        for authorship in work.get(
+            "authorships",
+            [],
+        ):
+            author = authorship.get(
+                "author"
+            ) or {}
+
+            author_name = author.get(
+                "display_name"
+            )
 
             if author_name:
-                authors.append(author_name)
+                authors.append(
+                    author_name
+                )
 
-        primary_location = work.get("primary_location") or {}
-        source = primary_location.get("source") or {}
+        primary_location = (
+            work.get("primary_location")
+            or {}
+        )
+
+        source = (
+            primary_location.get("source")
+            or {}
+        )
+
+        abstract = reconstruct_abstract(
+            work.get(
+                "abstract_inverted_index"
+            )
+        )
 
         paper = {
             "openalex_id": work.get("id"),
             "title": work.get("display_name"),
-            "year": work.get("publication_year"),
+            "year": work.get(
+                "publication_year"
+            ),
+            "publication_date": work.get(
+                "publication_date"
+            ),
             "doi": work.get("doi"),
             "type": work.get("type"),
             "language": work.get("language"),
-            "cited_by_count": work.get("cited_by_count", 0),
+            "cited_by_count": work.get(
+                "cited_by_count",
+                0,
+            ),
             "authors": authors,
-            "venue": source.get("display_name"),
+            "venue": source.get(
+                "display_name"
+            ),
+            "abstract": abstract,
         }
 
         papers.append(paper)
