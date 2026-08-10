@@ -220,3 +220,5 @@ __marimo__/
 .idea/
 # Environment variables
 .env
+# Local AI models
+models/

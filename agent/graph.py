@@ -2,9 +2,11 @@ from langgraph.graph import END, START, StateGraph
 
 from agent.nodes import (
     build_search_plan_node,
+    evidence_quality_node,
     general_answer_node,
     paper_search_node,
     planner_node,
+    relevance_ranking_node,
     research_answer_node,
     route_question,
 )
@@ -14,7 +16,6 @@ from agent.state import AgentState
 def create_agent_graph():
     builder = StateGraph(AgentState)
 
-    # 1. 注册节点
     builder.add_node(
         "planner",
         planner_node,
@@ -36,17 +37,25 @@ def create_agent_graph():
     )
 
     builder.add_node(
+        "evidence_quality",
+        evidence_quality_node,
+    )
+
+    builder.add_node(
+        "relevance_ranking",
+        relevance_ranking_node,
+    )
+
+    builder.add_node(
         "research_answer",
         research_answer_node,
     )
 
-    # 2. 图的入口
     builder.add_edge(
         START,
         "planner",
     )
 
-    # 3. Planner 条件路由
     builder.add_conditional_edges(
         "planner",
         route_question,
@@ -56,7 +65,6 @@ def create_agent_graph():
         },
     )
 
-    # 4. Research 路线
     builder.add_edge(
         "build_search_plan",
         "paper_search",
@@ -64,10 +72,19 @@ def create_agent_graph():
 
     builder.add_edge(
         "paper_search",
+        "evidence_quality",
+    )
+
+    builder.add_edge(
+        "evidence_quality",
+        "relevance_ranking",
+    )
+
+    builder.add_edge(
+        "relevance_ranking",
         "research_answer",
     )
 
-    # 5. 两条路线的结束节点
     builder.add_edge(
         "general_answer",
         END,
@@ -92,7 +109,7 @@ def run_agent(question: str) -> str:
 
     result = agent_graph.invoke(
         {
-            "question": question,
+            "question": question
         }
     )
 
@@ -100,7 +117,8 @@ def run_agent(question: str) -> str:
 
     if not answer:
         raise RuntimeError(
-            "Agent finished without producing an answer."
+            "Agent finished without "
+            "producing an answer."
         )
 
     return answer
