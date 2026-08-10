@@ -3,6 +3,10 @@ from llm.client import chat, chat_json
 from tools.paper_search import search_papers
 from datetime import date
 from evidence.quality import filter_papers
+from evidence.relevance import rank_papers
+from evidence.semantic_relevance import (
+    rank_papers_semantically,
+)
 
 PLANNER_SYSTEM_PROMPT = """
 You are the routing planner of a scientific research assistant.
@@ -163,7 +167,9 @@ def general_answer_node(state: AgentState) -> dict:
 def research_answer_node(
     state: AgentState,
 ) -> dict:
-    print("[LangGraph] Enter research answer node")
+    print(
+        "[LangGraph] Enter research answer node"
+    )
 
     question = state["question"]
 
@@ -174,7 +180,8 @@ def research_answer_node(
 
     if not papers:
         raise RuntimeError(
-            "No papers found in state for research answer."
+            "No papers found in state "
+            "for research answer."
         )
 
     from_year = state.get(
@@ -190,6 +197,35 @@ def research_answer_node(
         "",
     )
 
+    candidate_papers = state.get(
+        "candidate_papers",
+        [],
+    )
+
+    quality_papers = state.get(
+        "quality_papers",
+        [],
+    )
+
+    candidate_count = len(
+        candidate_papers
+    )
+
+    quality_count = len(
+        quality_papers
+    )
+
+    selected_count = len(
+        papers
+    )
+
+    print(
+        "[LangGraph] Evidence pipeline: "
+        f"{candidate_count} candidates -> "
+        f"{quality_count} quality -> "
+        f"{selected_count} selected"
+    )
+
     paper_lines = []
 
     for index, paper in enumerate(
@@ -197,7 +233,10 @@ def research_answer_node(
         start=1,
     ):
         authors = ", ".join(
-            paper.get("authors", [])
+            paper.get(
+                "authors",
+                [],
+            )
         )
 
         abstract = (
@@ -257,18 +296,33 @@ User question:
 Search plan:
 - Search query: {search_query}
 - Search time range: {time_range}
-- Retrieved papers: {len(papers)}
+
+Evidence pipeline:
+- Candidate papers retrieved: {candidate_count}
+- Papers passed evidence quality filtering: {quality_count}
+- Final papers selected after semantic ranking: {selected_count}
 
 Important:
 The search time range above has already been determined by the
 Search Planner. Do not reinterpret it.
 
-Retrieved academic evidence:
+The evidence pipeline above describes three different stages:
+candidate retrieval, evidence quality filtering, and semantic
+ranking. Do not confuse the final selected evidence papers with
+the total number of candidate papers originally retrieved.
+
+When describing the literature retrieval process, report these
+stages accurately. For example, if 15 candidate papers were
+retrieved, 14 passed quality filtering, and 5 were selected after
+semantic ranking, do not simply say that only 5 papers were
+retrieved.
+
+Final selected academic evidence:
 
 {papers_context}
 
-Please answer the user's research question based on the retrieved
-academic evidence.
+Please answer the user's research question based on the final
+selected academic evidence above.
 
 Requirements:
 
@@ -276,22 +330,35 @@ Requirements:
    titles and abstracts.
 
 2. Summarize the major research directions or findings supported
-   by the retrieved sample.
+   by the final selected evidence sample.
 
 3. Clearly distinguish:
-   - evidence directly supported by the retrieved papers
-   - broader inference based on the retrieved sample
+   - evidence directly supported by the selected papers
+   - broader inference based on the selected sample
 
-4. If the actual publication years of the retrieved papers do not
+4. When describing the retrieval process, clearly distinguish:
+   - candidate papers retrieved
+   - papers remaining after evidence quality filtering
+   - final papers selected after semantic ranking
+
+5. Do not say that only the final selected papers were "retrieved"
+   if more candidate papers were initially retrieved.
+
+6. If the actual publication years of the selected papers do not
    cover every year in the search time range, state this accurately.
 
-5. Do not introduce years outside the specified search time range
+7. Do not introduce years outside the specified search time range
    when discussing missing coverage.
 
-6. Do not fabricate papers, methods, datasets, results, or citations.
+8. Do not fabricate papers, methods, datasets, results, citations,
+   or other academic evidence.
 
-7. Explicitly state that conclusions are based on the retrieved
-   sample when the sample size is limited.
+9. Explicitly state that conclusions are based on the final selected
+   evidence sample when the sample size is limited.
+
+10. Do not claim that the selected sample represents the complete
+    literature or the definitive research trends of the entire field
+    unless the provided evidence is sufficient to support that claim.
 """.strip()
 
     answer = chat(
@@ -467,15 +534,9 @@ def evidence_quality_node(
             "No candidate papers found in state."
         )
 
-    search_limit = state.get(
-        "search_limit",
-        5,
-    )
-
-    selected_papers, rejected_papers = (
+    quality_papers, rejected_papers = (
         filter_papers(
-            candidate_papers,
-            limit=search_limit,
+            candidate_papers
         )
     )
 
@@ -494,8 +555,8 @@ def evidence_quality_node(
     )
 
     print(
-        f"  selected: "
-        f"{len(selected_papers)}"
+        f"  accepted: "
+        f"{len(quality_papers)}"
     )
 
     for rejected in rejected_papers:
@@ -505,10 +566,90 @@ def evidence_quality_node(
             f"({rejected['reason']})"
         )
 
-    if not selected_papers:
+    if not quality_papers:
         raise RuntimeError(
             "No papers remained after "
             "evidence quality filtering."
+        )
+
+    return {
+        "quality_papers": quality_papers
+    }
+
+
+def relevance_ranking_node(
+    state: AgentState,
+) -> dict:
+    print(
+        "[LangGraph] Enter relevance ranking node"
+    )
+
+    quality_papers = state.get(
+        "quality_papers",
+        [],
+    )
+
+    if not quality_papers:
+        raise RuntimeError(
+            "No quality papers found in state."
+        )
+
+    search_query = state.get(
+        "search_query",
+        "",
+    )
+
+    if not search_query:
+        raise RuntimeError(
+            "No search_query found in state "
+            "for relevance ranking."
+        )
+
+    search_limit = state.get(
+        "search_limit",
+        5,
+    )
+
+    ranked_papers = (
+        rank_papers_semantically(
+            quality_papers,
+            search_query,
+        )
+    )
+
+    selected_papers = ranked_papers[
+        :search_limit
+    ]
+
+    print(
+        "[LangGraph] Semantic relevance ranking:"
+    )
+
+    print(
+        f"  quality papers: "
+        f"{len(quality_papers)}"
+    )
+
+    print(
+        f"  selected: "
+        f"{len(selected_papers)}"
+    )
+
+    for index, paper in enumerate(
+        selected_papers,
+        start=1,
+    ):
+        print(
+            f"  {index}. "
+            f"{paper.get('title')} "
+            f"(semantic_score="
+            f"{paper.get('semantic_score')})"
+        )
+
+    if not selected_papers:
+        raise RuntimeError(
+            "No papers remained after "
+            "semantic relevance ranking."
         )
 
     return {

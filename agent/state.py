@@ -18,6 +18,10 @@ class AgentState(TypedDict):
         list[dict[str, Any]]
     ]
 
+    quality_papers: NotRequired[
+        list[dict[str, Any]]
+    ]
+
     papers: NotRequired[
         list[dict[str, Any]]
     ]

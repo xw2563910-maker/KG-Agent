@@ -54,7 +54,6 @@ def main():
 
     selected, rejected = filter_papers(
         papers,
-        limit=5,
     )
 
     print("Selected papers:")

@@ -114,7 +114,6 @@ def evaluate_paper_quality(
 
 def filter_papers(
     papers: list[dict[str, Any]],
-    limit: int,
     min_abstract_words: int = DEFAULT_MIN_ABSTRACT_WORDS,
 ) -> tuple[
     list[dict[str, Any]],
@@ -130,10 +129,6 @@ def filter_papers(
         rejected_papers:
             Papers rejected with reasons.
     """
-    if limit < 1:
-        raise ValueError(
-            "Evidence selection limit must be at least 1."
-        )
 
     selected_papers = []
     rejected_papers = []
@@ -181,7 +176,5 @@ def filter_papers(
             paper
         )
 
-        if len(selected_papers) >= limit:
-            break
 
     return selected_papers, rejected_papers
