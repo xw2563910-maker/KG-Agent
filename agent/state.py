@@ -14,6 +14,12 @@ class AgentState(TypedDict):
     to_year: NotRequired[int]
     search_limit: NotRequired[int]
 
-    papers: NotRequired[list[dict[str, Any]]]
+    candidate_papers: NotRequired[
+        list[dict[str, Any]]
+    ]
+
+    papers: NotRequired[
+        list[dict[str, Any]]
+    ]
 
     answer: NotRequired[str]

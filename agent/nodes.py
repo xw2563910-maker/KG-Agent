@@ -2,6 +2,7 @@ from agent.state import AgentState, Route
 from llm.client import chat, chat_json
 from tools.paper_search import search_papers
 from datetime import date
+from evidence.quality import filter_papers
 
 PLANNER_SYSTEM_PROMPT = """
 You are the routing planner of a scientific research assistant.
@@ -407,9 +408,7 @@ Generate the academic paper search plan.
     }
 
 
-def paper_search_node(
-    state: AgentState,
-) -> dict:
+def paper_search_node(state: AgentState) -> dict:
     print("[LangGraph] Enter paper search node")
 
     search_query = state.get("search_query")
@@ -421,23 +420,97 @@ def paper_search_node(
 
     from_year = state.get("from_year")
     to_year = state.get("to_year")
+
     search_limit = state.get(
         "search_limit",
         5,
     )
 
-    papers = search_papers(
+    candidate_limit = min(
+        search_limit * 3,
+        25,
+    )
+
+    candidate_papers = search_papers(
         query=search_query,
-        limit=search_limit,
+        limit=candidate_limit,
         from_year=from_year,
         to_year=to_year,
         require_abstract=True,
     )
 
     print(
-        f"[LangGraph] Retrieved {len(papers)} papers"
+        f"[LangGraph] Retrieved "
+        f"{len(candidate_papers)} "
+        f"candidate papers"
     )
 
     return {
-        "papers": papers
+        "candidate_papers": candidate_papers
+    }
+
+
+def evidence_quality_node(
+    state: AgentState,
+) -> dict:
+    print(
+        "[LangGraph] Enter evidence quality node"
+    )
+
+    candidate_papers = state.get(
+        "candidate_papers",
+        [],
+    )
+
+    if not candidate_papers:
+        raise RuntimeError(
+            "No candidate papers found in state."
+        )
+
+    search_limit = state.get(
+        "search_limit",
+        5,
+    )
+
+    selected_papers, rejected_papers = (
+        filter_papers(
+            candidate_papers,
+            limit=search_limit,
+        )
+    )
+
+    print(
+        "[LangGraph] Evidence quality:"
+    )
+
+    print(
+        f"  candidates: "
+        f"{len(candidate_papers)}"
+    )
+
+    print(
+        f"  rejected: "
+        f"{len(rejected_papers)}"
+    )
+
+    print(
+        f"  selected: "
+        f"{len(selected_papers)}"
+    )
+
+    for rejected in rejected_papers:
+        print(
+            f"  - rejected: "
+            f"{rejected['title']} "
+            f"({rejected['reason']})"
+        )
+
+    if not selected_papers:
+        raise RuntimeError(
+            "No papers remained after "
+            "evidence quality filtering."
+        )
+
+    return {
+        "papers": selected_papers
     }

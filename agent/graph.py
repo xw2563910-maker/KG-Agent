@@ -2,6 +2,7 @@ from langgraph.graph import END, START, StateGraph
 
 from agent.nodes import (
     build_search_plan_node,
+    evidence_quality_node,
     general_answer_node,
     paper_search_node,
     planner_node,
@@ -19,7 +20,10 @@ def create_agent_graph():
         "planner",
         planner_node,
     )
-
+    builder.add_node(
+        "evidence_quality",
+        evidence_quality_node,
+    )
     builder.add_node(
         "general_answer",
         general_answer_node,
@@ -64,6 +68,11 @@ def create_agent_graph():
 
     builder.add_edge(
         "paper_search",
+        "evidence_quality",
+    )
+
+    builder.add_edge(
+        "evidence_quality",
         "research_answer",
     )
 
