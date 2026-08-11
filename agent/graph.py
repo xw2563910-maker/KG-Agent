@@ -5,6 +5,8 @@ from agent.nodes import (
     evidence_quality_node,
     general_answer_node,
     paper_search_node,
+    pdf_answer_node,
+    pdf_retrieval_node,
     planner_node,
     relevance_ranking_node,
     research_answer_node,
@@ -50,7 +52,15 @@ def create_agent_graph():
         "research_answer",
         research_answer_node,
     )
+    builder.add_node(
+        "pdf_retrieval",
+        pdf_retrieval_node,
+    )
 
+    builder.add_node(
+        "pdf_answer",
+        pdf_answer_node,
+    )
     builder.add_edge(
         START,
         "planner",
@@ -62,6 +72,7 @@ def create_agent_graph():
         {
             "general": "general_answer",
             "research": "build_search_plan",
+            "pdf": "pdf_retrieval",
         },
     )
 
@@ -94,23 +105,46 @@ def create_agent_graph():
         "research_answer",
         END,
     )
+    builder.add_edge(
+        "pdf_retrieval",
+        "pdf_answer",
+    )
 
+    builder.add_edge(
+        "pdf_answer",
+        END,
+    )
     return builder.compile()
 
 
 agent_graph = create_agent_graph()
 
 
-def run_agent(question: str) -> str:
+def run_agent(
+    question: str,
+    pdf_path: str | None = None,
+) -> str:
     if not question.strip():
         raise ValueError(
             "Question cannot be empty."
         )
 
+    input_state = {
+        "question": question
+    }
+
+    if pdf_path is not None:
+        pdf_path = pdf_path.strip()
+
+        if not pdf_path:
+            raise ValueError(
+                "pdf_path cannot be empty."
+            )
+
+        input_state["pdf_path"] = pdf_path
+
     result = agent_graph.invoke(
-        {
-            "question": question
-        }
+        input_state
     )
 
     answer = result.get("answer")

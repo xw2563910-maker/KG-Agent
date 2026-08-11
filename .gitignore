@@ -222,3 +222,6 @@ __marimo__/
 .env
 # Local AI models
 models/
+# Local PDF documents
+data/pdfs/
+
