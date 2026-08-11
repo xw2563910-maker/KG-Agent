@@ -1,7 +1,16 @@
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import (
+    Any,
+    Literal,
+    NotRequired,
+    TypedDict,
+)
 
 
-Route = Literal["general", "research"]
+Route = Literal[
+    "general",
+    "research",
+    "pdf",
+]
 
 
 class AgentState(TypedDict):
@@ -23,6 +32,12 @@ class AgentState(TypedDict):
     ]
 
     papers: NotRequired[
+        list[dict[str, Any]]
+    ]
+
+    pdf_path: NotRequired[str]
+
+    retrieved_chunks: NotRequired[
         list[dict[str, Any]]
     ]
 

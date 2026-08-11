@@ -3,3 +3,7 @@ langchain
 python-dotenv
 openai
 httpx
+sentence-transformers
+numpy
+pypdf
+faiss-cpu==1.14.2

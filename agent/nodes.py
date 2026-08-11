@@ -7,6 +7,14 @@ from evidence.relevance import rank_papers
 from evidence.semantic_relevance import (
     rank_papers_semantically,
 )
+from rag.chunker import chunk_pages
+from rag.embeddings import (
+    embed_chunks,
+    embed_query,
+)
+from rag.pdf_loader import load_pdf_pages
+from rag.qa import answer_pdf_question
+from rag.vector_store import VectorStore
 
 PLANNER_SYSTEM_PROMPT = """
 You are the routing planner of a scientific research assistant.
@@ -126,6 +134,21 @@ Return JSON only.
 def planner_node(state: AgentState) -> dict:
     print("[LangGraph] Enter planner node")
 
+    pdf_path = str(
+        state.get("pdf_path") or ""
+    ).strip()
+
+    if pdf_path:
+        route: Route = "pdf"
+
+        print(
+            "[LangGraph] Planner route: pdf"
+        )
+
+        return {
+            "route": route
+        }
+
     question = state["question"]
 
     result = chat(
@@ -144,7 +167,9 @@ def planner_node(state: AgentState) -> dict:
             f"Planner returned an invalid route: {result}"
         )
 
-    print(f"[LangGraph] Planner route: {route}")
+    print(
+        f"[LangGraph] Planner route: {route}"
+    )
 
     return {
         "route": route
@@ -371,10 +396,16 @@ Requirements:
     }
 
 
-def route_question(state: AgentState) -> Route:
+def route_question(
+    state: AgentState,
+) -> Route:
     route = state.get("route")
 
-    if route not in ("general", "research"):
+    if route not in (
+        "general",
+        "research",
+        "pdf",
+    ):
         raise RuntimeError(
             f"Invalid route in agent state: {route}"
         )
@@ -654,4 +685,110 @@ def relevance_ranking_node(
 
     return {
         "papers": selected_papers
+    }
+
+
+def pdf_retrieval_node(
+    state: AgentState,
+) -> dict:
+    print(
+        "[LangGraph] Enter PDF retrieval node"
+    )
+
+    question = state["question"]
+
+    pdf_path = str(
+        state.get("pdf_path") or ""
+    ).strip()
+
+    if not pdf_path:
+        raise RuntimeError(
+            "No pdf_path found in state."
+        )
+
+    pages = load_pdf_pages(
+        pdf_path
+    )
+
+    chunks = chunk_pages(
+        pages
+    )
+
+    chunk_embeddings = embed_chunks(
+        chunks
+    )
+
+    vector_store = VectorStore(
+        chunks,
+        chunk_embeddings,
+    )
+
+    query_embedding = embed_query(
+        question
+    )
+
+    retrieved_chunks = vector_store.search(
+        query_embedding,
+        top_k=5,
+    )
+
+    if not retrieved_chunks:
+        raise RuntimeError(
+            "PDF retrieval returned no chunks."
+        )
+
+    print(
+        "[LangGraph] PDF retrieval:"
+    )
+
+    print(
+        f"  pages: {len(pages)}"
+    )
+
+    print(
+        f"  chunks: {len(chunks)}"
+    )
+
+    print(
+        f"  indexed: "
+        f"{vector_store.index.ntotal}"
+    )
+
+    print(
+        f"  retrieved: "
+        f"{len(retrieved_chunks)}"
+    )
+
+    return {
+        "retrieved_chunks": retrieved_chunks
+    }
+
+
+def pdf_answer_node(
+    state: AgentState,
+) -> dict:
+    print(
+        "[LangGraph] Enter PDF answer node"
+    )
+
+    question = state["question"]
+
+    retrieved_chunks = state.get(
+        "retrieved_chunks",
+        [],
+    )
+
+    if not retrieved_chunks:
+        raise RuntimeError(
+            "No retrieved PDF chunks "
+            "found in state."
+        )
+
+    answer = answer_pdf_question(
+        question,
+        retrieved_chunks,
+    )
+
+    return {
+        "answer": answer
     }

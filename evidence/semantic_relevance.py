@@ -5,47 +5,15 @@ from sentence_transformers import (
     SentenceTransformer,
     util,
 )
-
-
-PROJECT_ROOT = Path(
-    __file__
-).resolve().parents[1]
-
-MODEL_PATH = (
-    PROJECT_ROOT
-    / "models"
-    / "embedding"
-    / "bge-small-en-v1.5"
+from embedding.model import (
+    get_embedding_model,
 )
+
 
 QUERY_INSTRUCTION = (
     "Represent this sentence for searching "
     "relevant passages: "
 )
-
-
-_embedding_model = None
-
-
-def get_embedding_model() -> SentenceTransformer:
-    """
-    Load and cache the local embedding model.
-    """
-    global _embedding_model
-
-    if _embedding_model is None:
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(
-                f"Embedding model not found: "
-                f"{MODEL_PATH}"
-            )
-
-        _embedding_model = SentenceTransformer(
-            str(MODEL_PATH),
-            local_files_only=True,
-        )
-
-    return _embedding_model
 
 
 def build_paper_text(
