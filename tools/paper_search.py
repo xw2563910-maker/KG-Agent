@@ -152,22 +152,40 @@ def search_papers(
 
     for work in data.get("results", []):
         authors = []
+        author_entities = []
 
         for authorship in work.get(
             "authorships",
             [],
         ):
-            author = authorship.get(
-                "author"
-            ) or {}
+            author = (
+                authorship.get("author")
+                or {}
+            )
+
+            author_id = author.get(
+                "id"
+            )
 
             author_name = author.get(
                 "display_name"
             )
 
+            # Keep the original author-name list
+            # for backward compatibility.
             if author_name:
                 authors.append(
                     author_name
+                )
+
+            # Keep structured OpenAlex author
+            # metadata for the knowledge graph.
+            if author_id:
+                author_entities.append(
+                    {
+                        "openalex_id": author_id,
+                        "name": author_name,
+                    }
                 )
 
         primary_location = (
@@ -180,6 +198,22 @@ def search_papers(
             or {}
         )
 
+        venue_id = source.get(
+            "id"
+        )
+
+        venue_name = source.get(
+            "display_name"
+        )
+
+        venue_entity = None
+
+        if venue_id:
+            venue_entity = {
+                "openalex_id": venue_id,
+                "name": venue_name,
+            }
+
         abstract = reconstruct_abstract(
             work.get(
                 "abstract_inverted_index"
@@ -188,27 +222,56 @@ def search_papers(
 
         paper = {
             "openalex_id": work.get("id"),
-            "title": work.get("display_name"),
+
+            "title": work.get(
+                "display_name"
+            ),
+
             "year": work.get(
                 "publication_year"
             ),
+
             "publication_date": work.get(
                 "publication_date"
             ),
-            "doi": work.get("doi"),
-            "type": work.get("type"),
-            "language": work.get("language"),
+
+            "doi": work.get(
+                "doi"
+            ),
+
+            "type": work.get(
+                "type"
+            ),
+
+            "language": work.get(
+                "language"
+            ),
+
             "cited_by_count": work.get(
                 "cited_by_count",
                 0,
             ),
+
+            # Existing fields used by the
+            # current research pipeline.
             "authors": authors,
-            "venue": source.get(
-                "display_name"
+            "venue": venue_name,
+
+            # New structured fields used
+            # by the knowledge graph.
+            "author_entities": (
+                author_entities
             ),
+
+            "venue_entity": (
+                venue_entity
+            ),
+
             "abstract": abstract,
         }
 
-        papers.append(paper)
+        papers.append(
+            paper
+        )
 
     return papers

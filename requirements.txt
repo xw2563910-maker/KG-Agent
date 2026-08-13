@@ -7,3 +7,4 @@ sentence-transformers
 numpy
 pypdf
 faiss-cpu==1.14.2
+neo4j
